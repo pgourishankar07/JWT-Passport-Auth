@@ -7,6 +7,16 @@ const LocalStratergy = require("passport-local").Strategy;
 const flash = require("express-flash");
 const session = require("express-session");
 const methodOverride = require("method-override");
+const mongoose = require("mongoose");
+
+mongoose.connect(process.env.MONGO_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+const db = mongoose.connection;
+db.on("error", (error) => console.error(error));
+db.once("open", () => console.log("Connected to MongoDB"));
 
 //MIDDLEWARE_____________________
 app.use(express.static("views"));
@@ -25,23 +35,19 @@ app.use(passport.session());
 app.use(methodOverride("_method"));
 
 //VAR____________________________
-const users = [];
 
 //AUTHENTICATION_________________
+const User = require("./models/User"); // Adjust path as needed
+
 function initialize(passport) {
   const authenticateUser = async (email, password, done) => {
-    const user = users.find((i) => i.email === email);
-
-    if (user == null) {
-      return done(null, false, { message: "No user with that email" });
-    }
-
     try {
-      if (
-        password &&
-        user.password &&
-        (await bcrypt.compare(password, user.password))
-      ) {
+      const user = await User.findOne({ email: email });
+      if (!user) {
+        return done(null, false, { message: "No user with that email" });
+      }
+
+      if (await bcrypt.compare(password, user.password)) {
         return done(null, user);
       } else {
         return done(null, false, { message: "Wrong Password" });
@@ -58,10 +64,14 @@ function initialize(passport) {
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
-  passport.deserializeUser((id, done) => {
-    return done(null, () => {
-      return users.find((i) => i.id === id);
-    });
+
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const user = await User.findById(id);
+      done(null, user);
+    } catch (error) {
+      done(error);
+    }
   });
 }
 
@@ -104,16 +114,16 @@ app.post(
 
 app.post("/register", checkNotAuth, async (req, res) => {
   try {
-    const hashedPassoword = await bcrypt.hash(req.body.password, 10);
-    users.push({
-      id: Date.now().toString(),
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    const user = new User({
       name: req.body.name,
       email: req.body.email,
-      password: hashedPassoword,
+      password: hashedPassword,
     });
-    console.log(users);
+    await user.save();
     res.redirect("/login");
   } catch (error) {
+    console.error(error);
     res.redirect("/register");
   }
 });
