@@ -1,0 +1,15 @@
+GET http://localhost:3000
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.YnVudHk.SAp_9itgxrE1eg2JhYC9S5-zcarJQw-6eQRIe1VNABk
+
+
+###
+POST http://localhost:3000/login
+Content-Type: application/json
+
+{
+    "user":"bunty"
+}
+
+###
+
+GET http://localhost:3000/user
